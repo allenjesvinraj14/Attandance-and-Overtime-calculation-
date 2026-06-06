@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Melodify — Attendance & Overtime</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#0b0f0e; --bg2:#111614; --bg3:#141a16; --surface:#1c2620;
+      --border:rgba(77,232,145,0.1); --border2:rgba(77,232,145,0.22); --border3:rgba(77,232,145,0.38);
+      --accent:#4de891; --accent2:#a8f5c8;
+      --text:#e8f5ec; --text2:#8aab94; --text3:#4d6655;
+      --red:#ff7070; --amber:#f5c842; --blue:#5bc0eb;
+      --mono:'DM Mono',monospace; --serif:'DM Serif Display',serif; --sans:'DM Sans',sans-serif;
+      --r:10px; --rs:6px;
+    }
+    html { scroll-behavior:smooth; }
+    body { font-family:var(--sans); background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
+    body::before {
+      content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:linear-gradient(rgba(77,232,145,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(77,232,145,.025) 1px,transparent 1px);
+      background-size:48px 48px;
+    }
+
+    /* ── Layout ── */
+    .layout { display:flex; min-height:100vh; position:relative; z-index:1; }
+    .sidebar {
+      width:224px; flex-shrink:0; border-right:1px solid var(--border);
+      background:var(--bg2); position:sticky; top:0; height:100vh; overflow-y:auto;
+      display:flex; flex-direction:column;
+    }
+    .main { flex:1; min-width:0; }
+
+    /* ── Sidebar ── */
+    .sidebar-logo { padding:1.5rem 1.25rem 1rem; border-bottom:1px solid var(--border); }
+    .logo-text { font-family:var(--serif); font-size:1.25rem; color:var(--text); }
+    .logo-text em { color:var(--accent); font-style:italic; }
+    .logo-sub { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:.06em; margin-top:3px; }
+    .sidebar-nav { padding:.75rem 0; flex:1; }
+    .nav-group { font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--text3); padding:.5rem 1.25rem .25rem; }
+    .nav-item {
+      display:flex; align-items:center; gap:8px; padding:.45rem 1.25rem;
+      cursor:pointer; font-size:13px; color:var(--text2); transition:all .15s;
+      border-left:2px solid transparent; user-select:none;
+    }
+    .nav-item:hover { background:var(--surface); color:var(--text); }
+    .nav-item.active { color:var(--accent); background:rgba(77,232,145,.06); border-left-color:var(--accent); }
+    .nm { font-family:var(--mono); font-size:9px; font-weight:500; padding:2px 5px; border-radius:3px; flex-shrink:0; }
+    .get  { background:rgba(91,192,235,.12); color:var(--blue);  border:1px solid rgba(91,192,235,.2); }
+    .post { background:rgba(77,232,145,.10); color:var(--accent); border:1px solid rgba(77,232,145,.2); }
+
+    /* ── Main header ── */
+    .main-header { padding:1.75rem 2.25rem 1.25rem; border-bottom:1px solid var(--border); background:var(--bg2); }
+    .page-title { font-family:var(--serif); font-size:1.7rem; font-weight:400; margin-bottom:3px; }
+    .page-title em { color:var(--accent); font-style:italic; }
+    .page-desc { font-size:12.5px; color:var(--text2); font-weight:300; font-family:var(--mono); }
+
+    /* ── Content ── */
+    .content { padding:1.75rem 2.25rem; display:flex; flex-direction:column; gap:1.25rem; }
+    .section { display:none; flex-direction:column; gap:1.25rem; }
+    .section.active { display:flex; }
+
+    /* ── Cards ── */
+    .card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
+    .card-header { padding:.875rem 1.25rem; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .card-title { font-size:13.5px; font-weight:500; flex:1; }
+    .card-body { padding:1.25rem; }
+
+    /* ── Forms ── */
+    .form-row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+    .fg { display:flex; flex-direction:column; gap:5px; }
+    .flabel { font-family:var(--mono); font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; }
+    input[type=number], select {
+      background:var(--bg3); border:1px solid var(--border2); border-radius:var(--rs);
+      color:var(--text); font-family:var(--mono); font-size:13px;
+      padding:.45rem .75rem; outline:none; width:130px; transition:border-color .15s;
+      -moz-appearance:textfield;
+    }
+    input[type=number]:focus, select:focus { border-color:var(--border3); }
+    input[type=number]::placeholder { color:var(--text3); }
+    select { width:80px; cursor:pointer; }
+
+    /* ── Buttons ── */
+    .btn {
+      display:inline-flex; align-items:center; gap:6px;
+      font-family:var(--mono); font-size:12px; font-weight:500;
+      padding:.45rem .9rem; border-radius:var(--rs); cursor:pointer;
+      border:1px solid; transition:all .15s; white-space:nowrap; background:transparent;
+    }
+    .btn-g { color:var(--accent); border-color:rgba(77,232,145,.3); background:rgba(77,232,145,.08); }
+    .btn-g:hover { background:rgba(77,232,145,.16); border-color:rgba(77,232,145,.5); }
+    .btn-r { color:var(--red);   border-color:rgba(255,112,112,.3); background:rgba(255,112,112,.07); }
+    .btn-r:hover { background:rgba(255,112,112,.15); }
+    .btn-a { color:var(--amber); border-color:rgba(245,200,66,.3);  background:rgba(245,200,66,.07); }
+    .btn-a:hover { background:rgba(245,200,66,.15); }
+    .btn-b { color:var(--blue);  border-color:rgba(91,192,235,.3);  background:rgba(91,192,235,.07); }
+    .btn-b:hover { background:rgba(91,192,235,.15); }
+    .btn:disabled { opacity:.38; cursor:not-allowed; pointer-events:none; }
+
+    /* ── Response box ── */
+    .resp {
+      background:var(--bg3); border:1px solid var(--border); border-radius:var(--rs);
+      padding:.875rem 1rem; margin-top:1rem; font-family:var(--mono); font-size:12px;
+      line-height:1.7; white-space:pre-wrap; word-break:break-all;
+      max-height:320px; overflow-y:auto; display:none;
+    }
+    .resp.show { display:block; }
+    .resp.ok  { border-color:rgba(77,232,145,.28); color:var(--accent2); }
+    .resp.err { border-color:rgba(255,112,112,.28); color:var(--red); }
+
+    /* ── Tables ── */
+    .tbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+    .tbl th {
+      font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.06em;
+      color:var(--text3); padding:.5rem .875rem; text-align:left;
+      border-bottom:1px solid var(--border); font-weight:400; white-space:nowrap;
+    }
+    .tbl td { padding:.55rem .875rem; border-bottom:1px solid rgba(77,232,145,.05); color:var(--text2); vertical-align:middle; }
+    .tbl tr:hover td { background:rgba(77,232,145,.025); }
+    .tbl tr:last-child td { border-bottom:none; }
+
+    /* ── Misc ── */
+    .pill { display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:3px; }
+    .pg { background:rgba(77,232,145,.1); color:var(--accent); }
+    .pa { background:rgba(245,200,66,.1);  color:var(--amber); }
+    .pr { background:rgba(255,112,112,.1); color:var(--red); }
+    .pb { background:rgba(91,192,235,.1);  color:var(--blue); }
+
+    .empty { text-align:center; padding:2.5rem 1rem; font-family:var(--mono); font-size:12px; color:var(--text3); }
+
+    .stat-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:1rem; }
+    .stat-box { background:var(--bg3); border:1px solid var(--border); border-radius:var(--rs); padding:.75rem 1rem; }
+    .stat-box-label { font-family:var(--mono); font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px; }
+    .stat-box-val { font-size:1.35rem; font-weight:500; }
+
+    .pagination { display:flex; align-items:center; gap:8px; padding:.75rem 1.25rem; border-top:1px solid var(--border); }
+    .page-info { font-family:var(--mono); font-size:11px; color:var(--text3); flex:1; }
+
+    .spinner { display:inline-block; width:11px; height:11px; border-radius:50%; border:2px solid rgba(77,232,145,.2); border-top-color:var(--accent); animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    .live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--accent); animation:blink 2s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+    .path-chip { font-family:var(--mono); font-size:11px; color:var(--text3); background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:2px 8px; }
+    .path-chip span { color:var(--accent2); }
+
+    @media(max-width:680px) {
+      .sidebar { width:52px; }
+      .sidebar-logo, .nav-group, .nav-item > *:not(.nm) { display:none; }
+      .nav-item { justify-content:center; padding:.6rem; }
+      .main-header, .content { padding:1rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar ─────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">Melodi<em>fy</em></div>
+      <div class="logo-sub">Attendance &amp; Overtime</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-group">Attendance</div>
+      <div class="nav-item active" onclick="show('active',this)">
+        <span class="nm get">GET</span><span>Active Workers</span>
+      </div>
+      <div class="nav-item" onclick="show('log',this)">
+        <span class="nm get">GET</span><span>Attendance Log</span>
+      </div>
+      <div class="nav-item" onclick="show('clockin',this)">
+        <span class="nm post">POST</span><span>Clock In</span>
+      </div>
+      <div class="nav-item" onclick="show('clockout',this)">
+        <span class="nm post">POST</span><span>Clock Out</span>
+      </div>
+      <div class="nav-group" style="margin-top:.5rem;">Overtime</div>
+      <div class="nav-item" onclick="show('otsummary',this)">
+        <span class="nm get">GET</span><span>OT Summary</span>
+      </div>
+      <div class="nav-item" onclick="show('otsettle',this)">
+        <span class="nm post">POST</span><span>Settle OT</span>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ── Main ────────────────────────────────────────── -->
+  <div class="main">
+    <div class="main-header">
+      <div class="page-title" id="pgTitle">Active <em>Workers</em></div>
+      <div class="page-desc" id="pgDesc">GET /api/attendance/active — workers currently clocked in (Redis)</div>
+    </div>
+    <div class="content">
+
+      <!-- Active Workers -->
+      <div class="section active" id="s-active">
+        <div class="card">
+          <div class="card-header">
+            <div class="live-dot"></div>
+            <div class="card-title">Workers currently clocked in</div>
+            <button class="btn btn-g" onclick="fetchActive()"><span id="sp-active"></span>↻ Refresh</button>
+          </div>
+          <div id="active-out"><div class="empty">Hit Refresh to load from Redis.</div></div>
+        </div>
+      </div>
+
+      <!-- Attendance Log -->
+      <div class="section" id="s-log">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Full attendance history</div>
+            <div class="fg" style="flex-direction:row;align-items:center;gap:6px;">
+              <label class="flabel" style="margin:0">Size</label>
+              <select id="logSize"><option>10</option><option selected>20</option><option>50</option></select>
+            </div>
+            <button class="btn btn-g" onclick="fetchLog(0)"><span id="sp-log"></span>↻ Load</button>
+          </div>
+          <div id="log-out"><div class="empty">Click Load to fetch records.</div></div>
+          <div id="log-pages" class="pagination" style="display:none">
+            <span class="page-info" id="log-info"></span>
+            <button class="btn btn-b" id="log-prev" onclick="fetchLog(logPage-1)">← Prev</button>
+            <button class="btn btn-b" id="log-next" onclick="fetchLog(logPage+1)">Next →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Clock In -->
+      <div class="section" id="s-clockin">
+        <div class="card">
+          <div class="card-header">
+            <span class="nm post">POST</span>
+            <div class="card-title">Clock a worker in</div>
+            <span class="path-chip">/api/attendance/clock-in</span>
+          </div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="fg">
+                <label class="flabel">Worker ID</label>
+                <input type="number" id="ci-wid" placeholder="e.g. 1" min="1" oninput="updateCiPreview()">
+              </div>
+              <div class="fg">
+                <label class="flabel">Site ID</label>
+                <input type="number" id="ci-sid" placeholder="e.g. 1" min="1" oninput="updateCiPreview()">
+              </div>
+              <button class="btn btn-g" onclick="doClockIn()"><span id="sp-ci"></span>Clock In</button>
+            </div>
+            <div class="resp" id="ci-resp"></div>
+          </div>
+        </div>
+        <div class="card" style="background:var(--bg3)">
+          <div class="card-header" style="border-bottom:none;padding-bottom:.5rem">
+            <div class="card-title" style="font-size:11px;color:var(--text3)">Request body preview</div>
+          </div>
+          <div class="card-body" style="padding-top:0">
+            <pre id="ci-preview" style="font-family:var(--mono);font-size:12px;color:var(--text2)">{ "workerId": _, "siteId": _ }</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Clock Out -->
+      <div class="section" id="s-clockout">
+        <div class="card">
+          <div class="card-header">
+            <span class="nm post">POST</span>
+            <div class="card-title">Clock a worker out</div>
+            <span class="path-chip">/api/attendance/clock-out?workerId=<span>{id}</span></span>
+          </div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="fg">
+                <label class="flabel">Worker ID</label>
+                <input type="number" id="co-wid" placeholder="e.g. 1" min="1">
+              </div>
+              <button class="btn btn-r" onclick="doClockOut()"><span id="sp-co"></span>Clock Out</button>
+            </div>
+            <div class="resp" id="co-resp"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OT Summary -->
+      <div class="section" id="s-otsummary">
+        <div class="card">
+          <div class="card-header">
+            <span class="nm get">GET</span>
+            <div class="card-title">Overtime summary by date</div>
+            <span class="path-chip">/api/overtime/summary/<span>{workerId}</span></span>
+          </div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="fg">
+                <label class="flabel">Worker ID</label>
+                <input type="number" id="ot-wid" placeholder="e.g. 1" min="1">
+              </div>
+              <button class="btn btn-g" onclick="fetchOT()"><span id="sp-ot"></span>Fetch Summary</button>
+            </div>
+          </div>
+          <div id="ot-out"></div>
+        </div>
+      </div>
+
+      <!-- Settle OT -->
+      <div class="section" id="s-otsettle">
+        <div class="card">
+          <div class="card-header">
+            <span class="nm post">POST</span>
+            <div class="card-title">Settle pending overtime</div>
+            <span class="path-chip">/api/overtime/settle/<span>{workerId}</span></span>
+          </div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text2);margin-bottom:1rem;line-height:1.6;">
+              Marks all PENDING overtime entries for the current month as SETTLED,
+              respecting the 60-hour monthly cap. No request body needed.
+            </p>
+            <div class="form-row">
+              <div class="fg">
+                <label class="flabel">Worker ID</label>
+                <input type="number" id="st-wid" placeholder="e.g. 1" min="1">
+              </div>
+              <button class="btn btn-a" onclick="doSettle()"><span id="sp-st"></span>Settle Overtime</button>
+            </div>
+            <div class="resp" id="st-resp"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let logPage = 0;
+const BASE = '';
+
+const PAGE_META = {
+  active:    ['Active <em>Workers</em>',       'GET /api/attendance/active — live sessions from Redis'],
+  log:       ['Attendance <em>Log</em>',        'GET /api/attendance/log?page=&size= — paginated history'],
+  clockin:   ['Clock <em>In</em>',              'POST /api/attendance/clock-in — body: { workerId, siteId }'],
+  clockout:  ['Clock <em>Out</em>',             'POST /api/attendance/clock-out?workerId={id}'],
+  otsummary: ['Overtime <em>Summary</em>',      'GET /api/overtime/summary/{workerId} → Map<LocalDate, OvertimeSummary>'],
+  otsettle:  ['Settle <em>Overtime</em>',       'POST /api/overtime/settle/{workerId} — current month, 60h cap'],
+};
+
+// ── Nav ───────────────────────────────────────────────────────────────────────
+function show(id, el) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('s-' + id).classList.add('active');
+  el.classList.add('active');
+  const [t, d] = PAGE_META[id];
+  document.getElementById('pgTitle').innerHTML = t;
+  document.getElementById('pgDesc').textContent = d;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function spin(id, on) { document.getElementById(id).innerHTML = on ? '<span class="spinner"></span>' : ''; }
+
+function setResp(id, msg, ok) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'resp show ' + (ok ? 'ok' : 'err');
+}
+
+function fmtDT(v) {
+  if (!v) return '—';
+  try { return new Date(v).toLocaleString('en-IN', { dateStyle:'medium', timeStyle:'short' }); }
+  catch { return v; }
+}
+
+function fmtH(v) { return (v == null || v === '') ? '—' : parseFloat(v).toFixed(2) + ' h'; }
+function fmtINR(v) { return (v == null) ? '—' : '₹' + parseFloat(v).toFixed(2); }
+
+// ── GET Active ────────────────────────────────────────────────────────────────
+// Response: List<Map> where each map has { workerId, siteId, clockIn }
+async function fetchActive() {
+  spin('sp-active', true);
+  try {
+    const res = await fetch(BASE + '/api/attendance/active');
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' — ' + await res.text());
+    const data = await res.json();
+
+    if (!data.length) {
+      document.getElementById('active-out').innerHTML = '<div class="empty">No workers currently clocked in.</div>';
+      return;
+    }
+
+    const rows = data.map(w => `<tr>
+      <td>${w.workerId ?? '—'}</td>
+      <td>${w.siteId ?? '—'}</td>
+      <td>${fmtDT(w.clockIn)}</td>
+      <td><span class="pill pg">● Active</span></td>
+    </tr>`).join('');
+
+    document.getElementById('active-out').innerHTML = `
+      <table class="tbl">
+        <thead><tr><th>Worker ID</th><th>Site ID</th><th>Clocked In</th><th>Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch(e) {
+    document.getElementById('active-out').innerHTML = `<div class="empty" style="color:var(--red)">${e.message}</div>`;
+  } finally { spin('sp-active', false); }
+}
+
+// ── GET Log ───────────────────────────────────────────────────────────────────
+// Response: Page<AttendanceLog> → { content:[{id,worker:{id,name},site:{id,name},date,clockIn,clockOut,totalHours,overtimeHours}], totalPages, totalElements, number, first, last }
+async function fetchLog(page) {
+  if (page < 0) return;
+  spin('sp-log', true);
+  const size = document.getElementById('logSize').value;
+  try {
+    const res = await fetch(`${BASE}/api/attendance/log?page=${page}&size=${size}`);
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' — ' + await res.text());
+    const data = await res.json();
+    logPage = page;
+
+    const items = Array.isArray(data) ? data : (data.content ?? []);
+
+    if (!items.length) {
+      document.getElementById('log-out').innerHTML = '<div class="empty">No records found.</div>';
+      document.getElementById('log-pages').style.display = 'none';
+      return;
+    }
+
+    const rows = items.map(l => {
+      // worker & site may be objects or null depending on Jackson lazy config
+      const wName = l.worker?.name ?? (l.worker?.id ? '#' + l.worker.id : '—');
+      const sName = l.site?.name  ?? (l.site?.id  ? '#' + l.site.id  : '—');
+      const otCell = (l.overtimeHours && l.overtimeHours > 0)
+        ? `<span class="pill pa">${fmtH(l.overtimeHours)}</span>` : '—';
+      return `<tr>
+        <td>${l.id}</td>
+        <td>${wName}</td>
+        <td>${sName}</td>
+        <td>${l.date ?? '—'}</td>
+        <td>${fmtDT(l.clockIn)}</td>
+        <td>${fmtDT(l.clockOut)}</td>
+        <td>${fmtH(l.totalHours)}</td>
+        <td>${otCell}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('log-out').innerHTML = `
+      <table class="tbl">
+        <thead><tr><th>#</th><th>Worker</th><th>Site</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Total hrs</th><th>OT hrs</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+
+    // Pagination
+    if (data.totalPages > 1) {
+      const pg = document.getElementById('log-pages');
+      pg.style.display = 'flex';
+      document.getElementById('log-info').textContent =
+        `Page ${data.number + 1} of ${data.totalPages} · ${data.totalElements} records`;
+      document.getElementById('log-prev').disabled = data.first;
+      document.getElementById('log-next').disabled = data.last;
+    } else {
+      document.getElementById('log-pages').style.display = 'none';
+    }
+  } catch(e) {
+    document.getElementById('log-out').innerHTML = `<div class="empty" style="color:var(--red)">${e.message}</div>`;
+  } finally { spin('sp-log', false); }
+}
+
+// ── POST Clock In ─────────────────────────────────────────────────────────────
+function updateCiPreview() {
+  const w = document.getElementById('ci-wid').value || '_';
+  const s = document.getElementById('ci-sid').value || '_';
+  document.getElementById('ci-preview').textContent = `{ "workerId": ${w}, "siteId": ${s} }`;
+}
+
+async function doClockIn() {
+  const workerId = document.getElementById('ci-wid').value;
+  const siteId   = document.getElementById('ci-sid').value;
+  if (!workerId || !siteId) { setResp('ci-resp','⚠ Enter both Worker ID and Site ID.',false); return; }
+  spin('sp-ci', true);
+  try {
+    const res = await fetch(BASE + '/api/attendance/clock-in', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ workerId: Number(workerId), siteId: Number(siteId) })
+    });
+    if (res.ok) {
+      setResp('ci-resp', `✓  Worker ${workerId} clocked in at site ${siteId}.\n(HTTP ${res.status})`, true);
+    } else {
+      const txt = await res.text();
+      setResp('ci-resp', `HTTP ${res.status}\n${txt}`, false);
+    }
+  } catch(e) { setResp('ci-resp','Error: ' + e.message, false); }
+  finally { spin('sp-ci', false); }
+}
+
+// ── POST Clock Out ────────────────────────────────────────────────────────────
+// Returns AttendanceLog: { id, worker:{…}, site:{…}, date, clockIn, clockOut, totalHours, overtimeHours }
+async function doClockOut() {
+  const workerId = document.getElementById('co-wid').value;
+  if (!workerId) { setResp('co-resp','⚠ Enter a Worker ID.',false); return; }
+  spin('sp-co', true);
+  try {
+    const res = await fetch(`${BASE}/api/attendance/clock-out?workerId=${workerId}`, { method:'POST' });
+    if (res.ok) {
+      let msg = `✓  Worker ${workerId} clocked out successfully.`;
+      try {
+        const d = await res.json();
+        msg = [
+          `✓  Clocked out — Log #${d.id}`,
+          `Date       : ${d.date ?? '—'}`,
+          `Clock-in   : ${fmtDT(d.clockIn)}`,
+          `Clock-out  : ${fmtDT(d.clockOut)}`,
+          `Total hrs  : ${fmtH(d.totalHours)}`,
+          `OT hrs     : ${fmtH(d.overtimeHours)}`,
+        ].join('\n');
+      } catch {}
+      setResp('co-resp', msg, true);
+    } else {
+      const txt = await res.text();
+      setResp('co-resp', `HTTP ${res.status}\n${txt}`, false);
+    }
+  } catch(e) { setResp('co-resp','Error: ' + e.message, false); }
+  finally { spin('sp-co', false); }
+}
+
+// ── GET OT Summary ────────────────────────────────────────────────────────────
+// Returns Map<LocalDate, OvertimeSummary>
+// Serialised as: { "2025-06-01": { "totalHours":2.5, "totalAmount":375.0, "entries":[…] }, … }
+async function fetchOT() {
+  const workerId = document.getElementById('ot-wid').value;
+  if (!workerId) { document.getElementById('ot-out').innerHTML = '<div class="empty" style="color:var(--red)">⚠ Enter a Worker ID.</div>'; return; }
+  spin('sp-ot', true);
+  try {
+    const res = await fetch(`${BASE}/api/overtime/summary/${workerId}`);
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' — ' + await res.text());
+    const data = await res.json();
+
+    const entries = Object.entries(data); // [ [date, {totalHours, totalAmount, entries:[]}], … ]
+    if (!entries.length) {
+      document.getElementById('ot-out').innerHTML = '<div class="empty" style="padding:.75rem 1.25rem">No pending overtime found for this worker.</div>';
+      return;
+    }
+
+    // Aggregate totals
+    let sumHrs = 0, sumAmt = 0;
+    entries.forEach(([, s]) => { sumHrs += s.totalHours ?? 0; sumAmt += s.totalAmount ?? 0; });
+
+    // Per-date rows — each entry in s.entries has: { overtimeHours, rate, amount, status, date }
+    const rows = entries.sort(([a],[b]) => a.localeCompare(b)).map(([date, s]) => {
+      // Show individual OvertimeEntry rows inside this date
+      const entryRows = (s.entries ?? []).map(e => `
+        <tr style="background:rgba(77,232,145,.015)">
+          <td style="padding-left:2rem;color:var(--text3);font-size:11px">↳ entry #${e.id ?? ''}</td>
+          <td>${fmtH(e.overtimeHours)}</td>
+          <td>${e.rate != null ? e.rate + '×' : '—'}</td>
+          <td>${fmtINR(e.amount)}</td>
+          <td><span class="pill ${e.status === 'SETTLED' ? 'pg' : 'pa'}">${e.status ?? '—'}</span></td>
+        </tr>`).join('');
+
+      return `
+        <tr>
+          <td style="font-weight:500;color:var(--text)">${date}</td>
+          <td>${fmtH(s.totalHours)}</td>
+          <td>—</td>
+          <td style="color:var(--text)">${fmtINR(s.totalAmount)}</td>
+          <td><span class="pill pa">PENDING</span></td>
+        </tr>${entryRows}`;
+    }).join('');
+
+    document.getElementById('ot-out').innerHTML = `
+      <div style="padding:1.25rem 1.25rem 0">
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-box-label">Total OT hours</div>
+            <div class="stat-box-val" style="color:var(--accent)">${sumHrs.toFixed(2)} h</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-label">Total payable</div>
+            <div class="stat-box-val" style="color:var(--text)">₹${sumAmt.toFixed(2)}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-label">Pending days</div>
+            <div class="stat-box-val" style="color:var(--amber)">${entries.length}</div>
+          </div>
+        </div>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Date</th><th>OT hrs</th><th>Rate</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch(e) {
+    document.getElementById('ot-out').innerHTML = `<div class="empty" style="color:var(--red);padding:.75rem 1.25rem">${e.message}</div>`;
+  } finally { spin('sp-ot', false); }
+}
+
+// ── POST Settle ───────────────────────────────────────────────────────────────
+async function doSettle() {
+  const workerId = document.getElementById('st-wid').value;
+  if (!workerId) { setResp('st-resp','⚠ Enter a Worker ID.',false); return; }
+  spin('sp-st', true);
+  try {
+    const res = await fetch(`${BASE}/api/overtime/settle/${workerId}`, { method:'POST' });
+    if (res.ok) {
+      setResp('st-resp',
+        `✓  Overtime settled for worker ${workerId}.\nAll PENDING entries for the current month have been marked SETTLED (60h cap applied).\n(HTTP ${res.status})`,
+        true);
+    } else {
+      const txt = await res.text();
+      setResp('st-resp', `HTTP ${res.status}\n${txt}`, false);
+    }
+  } catch(e) { setResp('st-resp','Error: ' + e.message, false); }
+  finally { spin('sp-st', false); }
+}
+</script>
+</body>
+</html>

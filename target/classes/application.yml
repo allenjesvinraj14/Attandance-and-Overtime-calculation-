@@ -1,0 +1,28 @@
+server:
+  port: 8083
+spring:
+  datasource:
+    url: jdbc:h2:mem:melodify;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  jpa:
+    hibernate:
+      ddl-auto: create-drop 
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: false
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+logging:
+  level:
+    root: DEBUG
+    org.springframework: DEBUG
+
+# Redis defaults – can be overridden via SPRING_REDIS_HOST, SPRING_REDIS_PORT
+spring.redis.host: ${SPRING_REDIS_HOST:localhost}
+spring.redis.port: ${SPRING_REDIS_PORT:6379}
